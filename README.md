@@ -11,7 +11,7 @@ VyaparOS simplifies everyday shop operations using voice and natural language (H
   - Powered by **Gnani Prisma STT** for accurate real-time transcription across Hindi, Hinglish, and English dialects.
   - **Live Speech Captions**: Real-time on-screen speech detection as the shopkeeper speaks.
   - **ChatGPT-Style Fluid Orb**: Buoyant, zero-g liquid water animations and glowing acoustic waves indicating idle, listening, and processing states.
-  - **Hero Microphone Action**: Prominent one-tap recording interface.
+  - **Hero Microphone & Audio File Upload**: Prominent one-tap recording interface along with direct audio file upload and drag-and-drop (.wav, .mp3, .m4a, .webm, .ogg, .flac).
 
 - **🛡️ Safe, Operation-Aware Confirmations**:
   - All critical business mutations (stock adjustments, credit sales, cash sales, repayments) require explicit shopkeeper confirmation.
@@ -100,3 +100,4 @@ pytest
 
 ## 📄 License
 MIT License. Built for India's small businesses.
+

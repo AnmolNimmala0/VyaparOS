@@ -1796,6 +1796,48 @@ tbody tr:hover td {
   color: #94a3b8;
 }
 
+.hero-mic-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.hero-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.hero-upload-btn:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.28);
+  border-color: #3b82f6;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.hero-upload-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hero-mic-card-dragover {
+  border: 2px dashed #38bdf8 !important;
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.6) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.4) !important;
+}
+
 /* Live Sound Wave Visualizer Bars */
 .soundwave-bars {
   display: flex;

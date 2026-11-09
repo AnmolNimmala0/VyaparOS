@@ -30,11 +30,16 @@ ALLOWED_CONTENT_TYPES = {
     "audio/vnd.wave",
     "audio/mpeg",
     "audio/mp3",
+    "audio/x-mp3",
     "audio/mp4",
     "audio/m4a",
+    "audio/x-m4a",
+    "audio/aac",
     "audio/webm",
     "audio/ogg",
     "audio/flac",
+    "audio/x-flac",
+    "audio/3gpp",
     "application/octet-stream",
 }
 

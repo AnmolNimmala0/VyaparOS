@@ -144,6 +144,8 @@ export default function Home() {
   const [commandText, setCommandText] = useState("");
   const [operationLoading, setOperationLoading] = useState(false);
   const [liveCaption, setLiveCaption] = useState("");
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Live Highlight & Operation-Aware Feedback
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -166,6 +168,7 @@ export default function Home() {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const speechRecognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadDashboard = useCallback(async () => {
     setError("");
@@ -268,6 +271,69 @@ export default function Home() {
       );
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const uploadAudioFile = async (file: File) => {
+    if (!file || processing || operationLoading) return;
+
+    setProcessing(true);
+    setVoiceError("");
+    setVoiceResult(null);
+    setUploadedFileName(file.name);
+
+    try {
+      const form = new FormData();
+      form.append("audio", file, file.name);
+
+      if (conversationId) {
+        form.append("conversation_id", conversationId);
+      }
+
+      const response = await fetch(`${API}/voice/process`, {
+        method: "POST",
+        body: form,
+      });
+
+      let result;
+
+      try {
+        result = await response.clone().json();
+      } catch {
+        const errorText = await response.text();
+
+        throw new Error(
+          errorText ||
+            `Server returned an invalid response (${response.status}).`
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Voice processing failed. Please try again."
+        );
+      }
+
+      setVoiceResult(result);
+      if (result.conversation_id) {
+        setConversationId(result.conversation_id);
+      }
+
+      if (
+        result.status === "READ_ONLY_SUCCESS" ||
+        result.status === "AWAITING_CONFIRMATION"
+      ) {
+        void loadDashboard();
+      }
+    } catch (err) {
+      setVoiceError(
+        err instanceof Error ? err.message : "Something went wrong."
+      );
+    } finally {
+      setProcessing(false);
+      setUploadedFileName(null);
     }
   };
 
@@ -975,6 +1041,8 @@ export default function Home() {
             <strong>
               {recording
                 ? "Listening to your voice..."
+                : uploadedFileName
+                ? `Processing "${uploadedFileName}"...`
                 : processing
                 ? "Transcribing with Prisma STT..."
                 : operationLoading
@@ -984,7 +1052,9 @@ export default function Home() {
             <span>
               {recording
                 ? "Speak now in Hindi, Hinglish, or English"
-                : "Voice or text in Hindi, Hinglish, & English"}
+                : uploadedFileName
+                ? "Analyzing uploaded audio file"
+                : "Voice or audio upload in Hindi, Hinglish, & English"}
             </span>
           </div>
         </div>
@@ -1123,9 +1193,39 @@ export default function Home() {
             </div>
           )}
 
-          {/* Hero Microphone Card */}
+          {/* Hidden File Input for Audio File Upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg,.flac,.3gp"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                void uploadAudioFile(file);
+                e.target.value = "";
+              }
+            }}
+          />
+
+          {/* Hero Microphone & Audio Upload Card */}
           <div
-            className={`hero-mic-card ${recording ? "hero-mic-card-recording" : ""}`}
+            className={`hero-mic-card ${recording ? "hero-mic-card-recording" : ""} ${
+              isDragging ? "hero-mic-card-dragover" : ""
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) {
+                void uploadAudioFile(file);
+              }
+            }}
             onClick={() => {
               if (processing || operationLoading) return;
               if (recording) stopRecording();
@@ -1181,8 +1281,12 @@ export default function Home() {
                 <strong>
                   {recording
                     ? "Tap to finish speaking"
+                    : uploadedFileName
+                    ? `Processing "${uploadedFileName}"...`
                     : processing
                     ? "Transcribing voice with Prisma..."
+                    : isDragging
+                    ? "Drop audio file to transcribe"
                     : "Tap microphone to speak"}
                 </strong>
                 {recording && (
@@ -1195,11 +1299,43 @@ export default function Home() {
                   </div>
                 )}
               </div>
-              <span>
-                {recording
-                  ? "Listening in real time · Click anywhere on card to stop"
-                  : "Voice recognized in Hindi · Hinglish · English"}
-              </span>
+              <div className="hero-mic-footer-row">
+                <span>
+                  {recording
+                    ? "Listening in real time · Click anywhere to stop"
+                    : uploadedFileName
+                    ? "Prisma STT transcribing..."
+                    : isDragging
+                    ? "Release to upload"
+                    : "Hindi · Hinglish · English"}
+                </span>
+                <button
+                  type="button"
+                  className="hero-upload-btn"
+                  disabled={processing || recording || operationLoading}
+                  title="Upload an audio file (.mp3, .wav, .m4a, etc.)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span>Upload audio</span>
+                </button>
+              </div>
             </div>
           </div>
 
