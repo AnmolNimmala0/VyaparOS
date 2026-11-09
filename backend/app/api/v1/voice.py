@@ -60,13 +60,22 @@ async def read_valid_audio(audio: UploadFile) -> tuple[bytes, str]:
     raw_content_type = audio.content_type or ""
     content_type = raw_content_type.split(";", 1)[0].strip().lower()
 
-    print("DEBUG AUDIO CONTENT TYPE:", repr(raw_content_type))
-    print("DEBUG NORMALIZED CONTENT TYPE:", repr(content_type))
+    audio_extensions = {
+        ".wav", ".mp3", ".m4a", ".aac", ".ogg", ".flac",
+        ".webm", ".aiff", ".aif", ".wma", ".3gp", ".amr", ".opus", ".mp4"
+    }
+    filename = (audio.filename or "").lower()
+    has_audio_ext = any(filename.endswith(ext) for ext in audio_extensions)
+    is_audio_mime = (
+        content_type.startswith("audio/")
+        or content_type in ALLOWED_CONTENT_TYPES
+        or content_type == "application/octet-stream"
+    )
 
-    if content_type not in ALLOWED_CONTENT_TYPES:
+    if not (is_audio_mime or has_audio_ext):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Unsupported audio format: {raw_content_type}",
+            detail=f"Unsupported audio format: {raw_content_type or 'unknown'}",
         )
 
     audio_bytes = await audio.read(MAX_AUDIO_SIZE + 1)
