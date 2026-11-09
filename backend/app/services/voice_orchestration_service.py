@@ -38,6 +38,46 @@ def format_quantity(quantity) -> str:
     return format(value.normalize(), "f")
 
 
+def detect_prompt_language(
+    transcript: str,
+    detected_language: str | None = None,
+    intent_language: str | None = None,
+) -> str:
+    """Detect whether prompt is Hindi/Hinglish or English."""
+    # 1. Check Devanagari Unicode range
+    if any("\u0900" <= ch <= "\u097f" for ch in transcript):
+        return "hi"
+
+    # 2. Check explicit detected_language or intent_language if indicating Hindi
+    for lang in (detected_language, intent_language):
+        if lang:
+            norm = lang.lower().strip()
+            if norm in {"hi", "hin", "hindi", "hi-in", "hinglish"}:
+                return "hi"
+
+    # 3. Check common Hindi / Hinglish words in transcript
+    tokens = set(
+        transcript.lower()
+        .replace("?", " ")
+        .replace(".", " ")
+        .replace(",", " ")
+        .replace("!", " ")
+        .split()
+    )
+    hindi_hinglish_words = {
+        "aaj", "kal", "hai", "hain", "kitna", "kitne", "kitni", "bhi", "ko",
+        "se", "ka", "ke", "ki", "mein", "me", "karo", "kardo", "aaye", "aaya",
+        "aayi", "bheja", "diye", "liya", "becha", "bikri", "udhaar", "vasooli",
+        "baaki", "rupaye", "paas", "kripya", "hoga", "hogi", "kuch", "aur",
+        "batao", "dikhao", "kar", "par", "h", "ji"
+    }
+    matches = sum(1 for w in tokens if w in hindi_hinglish_words)
+    if matches >= 2 or (matches >= 1 and len(tokens) <= 4):
+        return "hi"
+
+    return "en"
+
+
 async def handle_read_only_action(
     db: AsyncSession,
     store_id: UUID,
@@ -84,12 +124,12 @@ async def handle_read_only_action(
 
         if language == "hi":
             message = (
-                f"{product.product_name} ka stock "
-                f"{quantity} {product.unit} hai."
+                f"Aapke paas {product.product_name} ke "
+                f"{quantity} {product.unit} stock mein hain."
             )
         else:
             message = (
-                f"You currently have {quantity} {product.unit} "
+                f"We have {quantity} {product.unit} "
                 f"of {product.product_name} in stock."
             )
 
@@ -298,18 +338,32 @@ async def process_transcript_request(
 
     intent = await analyze_intent(transcript)
 
+    target_language = detect_prompt_language(
+        transcript=transcript,
+        detected_language=detected_language,
+        intent_language=intent.language,
+    )
+
     if not intent.actions:
+        msg = (
+            "Mujhe is request mein koi business action nahi mila."
+            if target_language == "hi"
+            else "I couldn't identify a business action in that request."
+        )
+        q = (
+            "Kripya dohrayein aap kya karna chahte hain?"
+            if target_language == "hi"
+            else "Could you repeat what you would like me to do?"
+        )
         return VoiceProcessResponse(
             status="CLARIFICATION_REQUIRED",
-            message="I couldn't identify a business action in that request.",
+            message=msg,
             transcript=transcript,
-            detected_language=detected_language,
+            detected_language=target_language,
             conversation_id=conversation_id,
             turn_id=turn.id,
             intent=intent.model_dump(mode="json"),
-            clarification_questions=[
-                "Could you repeat what you would like me to do?"
-            ],
+            clarification_questions=[q],
         )
 
     # ---------------------------------------------------------
@@ -317,20 +371,25 @@ async def process_transcript_request(
     # ---------------------------------------------------------
 
     if len(intent.actions) != 1:
+        msg = (
+            "Kripya ek baar mein ek hi request karein taaki hum har kaam theek se verify kar sakein."
+            if target_language == "hi"
+            else "Please make one business request at a time so I can verify each operation independently."
+        )
+        q = (
+            "Kripya sirf ek action ke saath request dohrayein."
+            if target_language == "hi"
+            else "Please repeat the request with only one business action."
+        )
         return VoiceProcessResponse(
             status="CLARIFICATION_REQUIRED",
-            message=(
-                "Please make one business request at a time "
-                "so I can verify each operation independently."
-            ),
+            message=msg,
             transcript=transcript,
-            detected_language=detected_language,
+            detected_language=target_language,
             conversation_id=conversation_id,
             turn_id=turn.id,
             intent=intent.model_dump(mode="json"),
-            clarification_questions=[
-                "Please repeat the request with only one business action."
-            ],
+            clarification_questions=[q],
         )
 
     # ---------------------------------------------------------
@@ -338,17 +397,26 @@ async def process_transcript_request(
     # ---------------------------------------------------------
 
     if intent.needs_clarification:
+        msg = (
+            "Aage badhne se pehle mujhe thodi aur jaankari chahiye."
+            if target_language == "hi"
+            else "I need a little more information before proceeding."
+        )
         questions = (
             [intent.clarification_question]
             if intent.clarification_question
-            else ["Could you clarify your request?"]
+            else [
+                "Kripya apni request thodi saaf karein."
+                if target_language == "hi"
+                else "Could you clarify your request?"
+            ]
         )
 
         return VoiceProcessResponse(
             status="CLARIFICATION_REQUIRED",
-            message="I need a little more information before proceeding.",
+            message=msg,
             transcript=transcript,
-            detected_language=detected_language,
+            detected_language=target_language,
             conversation_id=conversation_id,
             turn_id=turn.id,
             intent=intent.model_dump(mode="json"),
@@ -366,11 +434,16 @@ async def process_transcript_request(
     )
 
     if resolved_intent.needs_clarification:
+        msg = (
+            "Main maange gaye product ya customer ki theek se pehchan nahi kar saka."
+            if target_language == "hi"
+            else "I couldn't confidently identify the requested entities."
+        )
         return VoiceProcessResponse(
             status="CLARIFICATION_REQUIRED",
-            message="I couldn't confidently identify the requested entities.",
+            message=msg,
             transcript=transcript,
-            detected_language=detected_language,
+            detected_language=target_language,
             conversation_id=conversation_id,
             turn_id=turn.id,
             intent=intent.model_dump(mode="json"),
@@ -397,14 +470,14 @@ async def process_transcript_request(
             db=db,
             store_id=store_id,
             action=action,
-            language=intent.language,
+            language=target_language,
         )
 
         return VoiceProcessResponse(
             status="READ_ONLY_SUCCESS",
             message=message,
             transcript=transcript,
-            detected_language=detected_language,
+            detected_language=target_language,
             conversation_id=conversation_id,
             turn_id=turn.id,
             intent=intent.model_dump(mode="json"),
@@ -420,14 +493,20 @@ async def process_transcript_request(
         db=db,
         store_id=store_id,
         resolved_intent=resolved_intent,
+        language=target_language,
     )
 
     if planning_result.needs_clarification:
+        msg = (
+            "Is operation ke liye thoda spashtikaran chahiye."
+            if target_language == "hi"
+            else "The requested operation needs clarification."
+        )
         return VoiceProcessResponse(
             status="CLARIFICATION_REQUIRED",
-            message="The requested operation needs clarification.",
+            message=msg,
             transcript=transcript,
-            detected_language=detected_language,
+            detected_language=target_language,
             conversation_id=conversation_id,
             turn_id=turn.id,
             intent=intent.model_dump(mode="json"),
@@ -462,7 +541,7 @@ async def process_transcript_request(
         status="AWAITING_CONFIRMATION",
         message=plan.confirmation_message,
         transcript=transcript,
-        detected_language=detected_language,
+        detected_language=target_language,
         conversation_id=conversation_id,
         turn_id=turn.id,
         intent=intent.model_dump(mode="json"),

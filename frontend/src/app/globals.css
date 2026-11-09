@@ -1253,11 +1253,69 @@ tbody tr:hover td {
 .ai-header-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 7px;
   font-size: 11px;
   font-weight: 700;
   color: var(--primary);
   letter-spacing: 0.3px;
+}
+
+.ai-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lang-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+  letter-spacing: 0.5px;
+}
+
+.tts-speaker-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #334155;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tts-speaker-btn:hover {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: #3b82f6;
+  color: #f8fafc;
+}
+
+.tts-speaker-btn.tts-speaking {
+  background: rgba(37, 99, 235, 0.25);
+  border-color: #60a5fa;
+  color: #bfdbfe;
+  animation: pulse-speaking 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-speaking {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(59, 130, 246, 0);
+  }
 }
 
 .ai-sparkle {

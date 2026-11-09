@@ -146,6 +146,7 @@ async def plan_sale(
     store_id: UUID,
     resolved_action: ResolvedAction,
     questions: list[str],
+    language: str = "en",
 ):
     action = resolved_action.original_action
 
@@ -346,28 +347,45 @@ async def plan_sale(
         line_total_paise=line_total_paise,
     )
 
-    customer_text = (
-        f" for {customer.name}" if customer is not None else ""
-    )
-
-    if amount_due_paise == 0:
-        payment_text = (
-            f"paid in {action.payment_method}"
+    if language == "hi":
+        prefix = "Ji, ise table mein abhi update kar rahe hain. Kripya confirm karein: "
+        customer_text = (
+            f" ({customer.name} ke liye)" if customer is not None else ""
         )
-    elif amount_paid_paise == 0:
-        payment_text = "fully on credit"
+        if amount_due_paise == 0:
+            payment_text = f"{action.payment_method or 'CASH'} mein chukta"
+        elif amount_paid_paise == 0:
+            payment_text = "poora udhaar pe"
+        else:
+            payment_text = (
+                f"₹{amount_paid_paise / 100:.2f} {action.payment_method or 'CASH'} mein, "
+                f"₹{amount_due_paise / 100:.2f} udhaar"
+            )
+        confirmation = (
+            f"{prefix}{quantity} x {product.name}{customer_text} bechein. "
+            f"Kul: ₹{total_amount_paise / 100:.2f} ({payment_text})."
+        )
     else:
-        payment_text = (
-            f"₹{amount_paid_paise / 100:.2f} paid in "
-            f"{action.payment_method}, "
-            f"₹{amount_due_paise / 100:.2f} on credit"
+        prefix = "Yes, updating this in our table right now. Please confirm: "
+        customer_text = (
+            f" for {customer.name}" if customer is not None else ""
         )
-
-    confirmation = (
-        f"Sell {quantity} x {product.name}{customer_text}. "
-        f"Total: ₹{total_amount_paise / 100:.2f}. "
-        f"{payment_text}."
-    )
+        if amount_due_paise == 0:
+            payment_text = (
+                f"paid in {action.payment_method or 'CASH'}"
+            )
+        elif amount_paid_paise == 0:
+            payment_text = "fully on credit"
+        else:
+            payment_text = (
+                f"₹{amount_paid_paise / 100:.2f} paid in "
+                f"{action.payment_method or 'CASH'}, "
+                f"₹{amount_due_paise / 100:.2f} on credit"
+            )
+        confirmation = (
+            f"{prefix}Sell {quantity} x {product.name}{customer_text}. "
+            f"Total: ₹{total_amount_paise / 100:.2f} ({payment_text})."
+        )
 
     return SaleOperationPlan(
         customer_id=customer.id if customer else None,
@@ -386,6 +404,7 @@ async def plan_repayment(
     store_id: UUID,
     resolved_action: ResolvedAction,
     questions: list[str],
+    language: str = "en",
 ):
     action = resolved_action.original_action
 
@@ -455,11 +474,19 @@ async def plan_repayment(
 
     new_outstanding_paise = outstanding_paise - amount_paise
 
-    confirmation = (
-        f"Record a repayment of ₹{amount_paise / 100:.2f} "
-        f"from {customer.name}. "
-        f"Remaining balance: ₹{new_outstanding_paise / 100:.2f}."
-    )
+    if language == "hi":
+        prefix = "Ji, ise table mein abhi update kar rahe hain. Kripya confirm karein: "
+        confirmation = (
+            f"{prefix}{customer.name} se ₹{amount_paise / 100:.2f} ki vasooli darj karein. "
+            f"Baaki udhaar: ₹{new_outstanding_paise / 100:.2f}."
+        )
+    else:
+        prefix = "Yes, updating this in our table right now. Please confirm: "
+        confirmation = (
+            f"{prefix}Record a repayment of ₹{amount_paise / 100:.2f} "
+            f"from {customer.name}. "
+            f"Remaining balance: ₹{new_outstanding_paise / 100:.2f}."
+        )
 
     return RepaymentOperationPlan(
         customer_id=customer.id,
@@ -476,6 +503,7 @@ async def plan_inventory_adjustment(
     store_id: UUID,
     resolved_action: ResolvedAction,
     questions: list[str],
+    language: str = "en",
 ) -> InventoryAdjustmentOperationPlan | None:
     action = resolved_action.original_action
 
@@ -532,16 +560,30 @@ async def plan_inventory_adjustment(
         )
         return None
 
-    if direction == "ADD":
-        confirmation = (
-            f"Add {quantity} {product.unit} of {product.name} to stock. "
-            f"Current stock: {current_quantity} {product.unit} → New stock: {new_quantity} {product.unit}."
-        )
+    if language == "hi":
+        prefix = "Ji, ise table mein abhi update kar rahe hain. Kripya confirm karein: "
+        if direction == "ADD":
+            confirmation = (
+                f"{prefix}{product.name} ke {quantity} {product.unit} stock mein jodein "
+                f"({current_quantity} → {new_quantity} {product.unit})."
+            )
+        else:
+            confirmation = (
+                f"{prefix}{product.name} ke {quantity} {product.unit} stock se ghatayein "
+                f"({current_quantity} → {new_quantity} {product.unit})."
+            )
     else:
-        confirmation = (
-            f"Remove {quantity} {product.unit} of {product.name} from stock. "
-            f"Current stock: {current_quantity} {product.unit} → New stock: {new_quantity} {product.unit}."
-        )
+        prefix = "Yes, updating this in our table right now. Please confirm: "
+        if direction == "ADD":
+            confirmation = (
+                f"{prefix}Add {quantity} {product.unit} of {product.name} to stock "
+                f"({current_quantity} → {new_quantity} {product.unit})."
+            )
+        else:
+            confirmation = (
+                f"{prefix}Remove {quantity} {product.unit} of {product.name} from stock "
+                f"({current_quantity} → {new_quantity} {product.unit})."
+            )
 
     return InventoryAdjustmentOperationPlan(
         product_id=product.id,
@@ -560,6 +602,7 @@ async def plan_operations(
     db: AsyncSession,
     store_id: UUID,
     resolved_intent: ResolvedIntent,
+    language: str = "en",
 ) -> OperationPlanningResult:
     """
     Create read-only operation proposals from resolved Gemini intent.
@@ -591,6 +634,7 @@ async def plan_operations(
                 store_id,
                 resolved_action,
                 questions,
+                language=language,
             )
 
         elif action_type == "record_credit_repayment":
@@ -599,6 +643,7 @@ async def plan_operations(
                 store_id,
                 resolved_action,
                 questions,
+                language=language,
             )
 
         elif action_type == "adjust_inventory":
@@ -607,6 +652,7 @@ async def plan_operations(
                 store_id,
                 resolved_action,
                 questions,
+                language=language,
             )
 
         else:

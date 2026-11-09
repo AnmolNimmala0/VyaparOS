@@ -85,6 +85,7 @@ type VoiceResult = {
   status: string;
   message: string;
   transcript: string;
+  detected_language?: string | null;
   conversation_id: string;
   pending_operation?: PendingOp | null;
   operation_plan?: OperationPlanData | null;
@@ -146,6 +147,36 @@ export default function Home() {
   const [liveCaption, setLiveCaption] = useState("");
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const speakMessage = useCallback((text: string, lang?: string | null) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    window.speechSynthesis.cancel();
+    if (!text) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const isHindi = lang === "hi";
+    utterance.lang = isHindi ? "hi-IN" : "en-IN";
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const matchedVoice = voices.find((v) =>
+      isHindi
+        ? v.lang.startsWith("hi")
+        : v.lang.startsWith("en-IN") || v.lang.startsWith("en-GB") || v.lang.startsWith("en")
+    );
+    if (matchedVoice) {
+      utterance.voice = matchedVoice;
+    }
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  }, []);
 
   // Live Highlight & Operation-Aware Feedback
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -258,6 +289,9 @@ export default function Home() {
       if (result.conversation_id) {
         setConversationId(result.conversation_id);
       }
+      if (result.message) {
+        speakMessage(result.message, result.detected_language);
+      }
 
       if (
         result.status === "READ_ONLY_SUCCESS" ||
@@ -320,6 +354,9 @@ export default function Home() {
       if (result.conversation_id) {
         setConversationId(result.conversation_id);
       }
+      if (result.message) {
+        speakMessage(result.message, result.detected_language);
+      }
 
       if (
         result.status === "READ_ONLY_SUCCESS" ||
@@ -378,6 +415,10 @@ export default function Home() {
 
       if (result.conversation_id) {
         setConversationId(result.conversation_id);
+      }
+
+      if (result.message) {
+        speakMessage(result.message, result.detected_language);
       }
 
       setCommandText("");
@@ -1022,12 +1063,16 @@ export default function Home() {
           <div className="orb-wrapper">
             <div
               className={`orb-liquid-halo ${
-                recording ? "orb-listening-mini" : processing ? "orb-processing-mini" : ""
+                isSpeaking || recording
+                  ? "orb-listening-mini"
+                  : processing
+                  ? "orb-processing-mini"
+                  : ""
               }`}
             />
             <div
               className={`orb-mini ${
-                recording
+                isSpeaking || recording
                   ? "orb-listening-mini"
                   : processing
                   ? "orb-processing-mini"
@@ -1039,7 +1084,9 @@ export default function Home() {
           </div>
           <div className="orb-status-text">
             <strong>
-              {recording
+              {isSpeaking
+                ? "Speaking reply..."
+                : recording
                 ? "Listening to your voice..."
                 : uploadedFileName
                 ? `Processing "${uploadedFileName}"...`
@@ -1050,7 +1097,9 @@ export default function Home() {
                 : "Ready for your command"}
             </strong>
             <span>
-              {recording
+              {isSpeaking
+                ? "Audio playback in progress"
+                : recording
                 ? "Speak now in Hindi, Hinglish, or English"
                 : uploadedFileName
                 ? "Analyzing uploaded audio file"
@@ -1077,8 +1126,35 @@ export default function Home() {
               {/* AI Response Card */}
               <div className="assistant-message-card">
                 <div className="ai-header-row">
-                  <span className="ai-sparkle">✦</span>
-                  <span>VYAPAR ASSISTANT</span>
+                  <div className="ai-header-brand">
+                    <span className="ai-sparkle">✦</span>
+                    <span>VYAPAR ASSISTANT</span>
+                    {voiceResult.detected_language && (
+                      <span className="lang-pill">
+                        {voiceResult.detected_language === "hi"
+                          ? "🇮🇳 HINDI"
+                          : "🌐 ENGLISH"}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={`tts-speaker-btn ${isSpeaking ? "tts-speaking" : ""}`}
+                    onClick={() => {
+                      if (isSpeaking) {
+                        window.speechSynthesis?.cancel();
+                        setIsSpeaking(false);
+                      } else {
+                        speakMessage(
+                          voiceResult.message,
+                          voiceResult.detected_language
+                        );
+                      }
+                    }}
+                    title="Listen to audio response"
+                  >
+                    {isSpeaking ? "🔊 Speaking..." : "🔊 Listen"}
+                  </button>
                 </div>
 
                 <div className="ai-text-box">
