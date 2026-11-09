@@ -24,7 +24,7 @@ SUPPORTED ACTION TYPES:
 - record_sale: Customer purchases goods and pays now.
 - record_credit_repayment: Customer repays previously borrowed money.
 - record_credit_sale: Shopkeeper gives goods to a customer on credit.
-- check_inventory: Shopkeeper asks about product stock.
+- check_inventory: Shopkeeper asks about product stock, price, rate, or availability (e.g. "maggie ka stock kitna hai", "maggie ka rate kitna hai", "maggie kitne ki aati hai", "how many packets of maggi do we have", "what is the price of maggi").
 - check_customer_balance: Shopkeeper asks how much a customer owes.
 - get_daily_summary: Shopkeeper asks for today's business summary.
 - adjust_inventory: Shopkeeper adds stock received from supplier or removes damaged/expired stock.
@@ -134,6 +134,7 @@ For record_credit_repayment:
 
 For check_inventory:
 - product_name should be extracted when explicitly mentioned.
+- Applies when shopkeeper asks about stock, quantity, rate, price, or availability of a product.
 
 For check_customer_balance:
 - customer_name should be extracted when explicitly mentioned.

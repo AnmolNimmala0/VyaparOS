@@ -4,7 +4,10 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.product import Product
 
 from app.integrations.gemini import analyze_intent
 from app.integrations.prisma import transcribe_audio
@@ -122,15 +125,28 @@ async def handle_read_only_action(
 
         quantity = format_quantity(product.quantity)
 
+        price_str = None
+        product_entity = await db.scalar(
+            select(Product).where(
+                Product.id == action.product.entity_id,
+                Product.store_id == store_id,
+            )
+        )
+        if product_entity is not None and product_entity.selling_price_paise is not None:
+            price_str = format_rupees(product_entity.selling_price_paise)
+
+        rate_hi = f" (bikri rate: {price_str})" if price_str else ""
+        rate_en = f" (selling price: {price_str})" if price_str else ""
+
         if language == "hi":
             message = (
                 f"Aapke paas {product.product_name} ke "
-                f"{quantity} {product.unit} stock mein hain."
+                f"{quantity} {product.unit} stock mein hain{rate_hi}."
             )
         else:
             message = (
                 f"We have {quantity} {product.unit} "
-                f"of {product.product_name} in stock."
+                f"of {product.product_name} in stock{rate_en}."
             )
 
         return message, {
@@ -139,6 +155,7 @@ async def handle_read_only_action(
             "product_name": product.product_name,
             "quantity": quantity,
             "unit": product.unit,
+            "selling_price": price_str,
             "reorder_level": format_quantity(product.reorder_level),
             "is_low_stock": product.is_low_stock,
         }

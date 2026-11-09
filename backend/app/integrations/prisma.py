@@ -10,7 +10,7 @@ class PrismaError(Exception):
 
 
 async def convert_to_wav(audio_bytes: bytes) -> bytes:
-    """Convert browser-recorded audio into 16 kHz mono PCM WAV."""
+    """Convert browser-recorded audio into 16 kHz mono PCM WAV with audio normalization."""
 
     process = await asyncio.create_subprocess_exec(
         "ffmpeg",
@@ -19,6 +19,7 @@ async def convert_to_wav(audio_bytes: bytes) -> bytes:
         "-i", "pipe:0",
         "-ar", "16000",
         "-ac", "1",
+        "-af", "dynaudnorm",
         "-c:a", "pcm_s16le",
         "-f", "wav",
         "pipe:1",
@@ -70,8 +71,9 @@ async def transcribe_audio(
 
     data = {
         "model": settings.PRISMA_MODEL,
-        "language_code": "en-IN",
+        "language_code": "indic-auto",
         "format": "codemix",
+        "keywords": "stock, rate, packet, packets, maggi, noodles, inventory, udhaar, cash, upi, customer, balance, bikri, vasooli, khata",
     }
 
     headers = {
@@ -91,6 +93,34 @@ async def transcribe_audio(
 
         response.raise_for_status()
         result = response.json()
+
+        # If indic-auto produced empty transcript, retry with hi-IN
+        transcript = result.get("transcript")
+        if not transcript or not transcript.strip():
+            retry_files = {
+                "audio_file": (
+                    "recording.wav",
+                    audio_bytes,
+                    "audio/wav",
+                )
+            }
+            retry_data = {
+                "model": settings.PRISMA_MODEL,
+                "language_code": "hi-IN",
+                "format": "codemix",
+                "keywords": data["keywords"],
+            }
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                retry_response = await client.post(
+                    settings.PRISMA_BASE_URL,
+                    headers=headers,
+                    data=retry_data,
+                    files=retry_files,
+                )
+            if retry_response.is_success:
+                retry_json = retry_response.json()
+                if retry_json.get("transcript"):
+                    result = retry_json
 
     except httpx.TimeoutException as exc:
         raise PrismaError("Prisma transcription timed out.") from exc
