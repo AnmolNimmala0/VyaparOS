@@ -1,5 +1,5 @@
-# VyaparOS 🇮🇳
-**Next-Generation AI-Native Business Operating System for Indian MSMEs & Retail**
+# VyaparOS
+**AI-Native Business Operating System for Indian Retail**
 
 VyaparOS simplifies everyday shop operations using voice and natural language (Hindi, Hinglish, & English). From voice-driven stock replenishment and inventory tracking to credit sales (*Udhaar*) and customer repayments (*Khata*), VyaparOS connects natural voice commands to atomic database transactions.
 
