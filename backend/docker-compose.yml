@@ -1,0 +1,22 @@
+
+services:
+  db:
+    image: postgres:16
+    container_name: vyaparos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vyapar
+      POSTGRES_PASSWORD: vyapar_dev_password
+      POSTGRES_DB: vyaparos
+    ports:
+    - "5433:5432"
+    volumes:
+      - vyaparos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vyapar -d vyaparos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  vyaparos_postgres_data:

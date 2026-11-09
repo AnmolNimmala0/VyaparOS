@@ -1,0 +1,35 @@
+
+# API framework
+fastapi
+uvicorn[standard]
+
+# Database and ORM
+sqlalchemy[asyncio]
+asyncpg
+greenlet
+alembic
+
+# Configuration and validation
+pydantic
+pydantic-settings
+python-dotenv
+
+# HTTP clients and AI integrations
+httpx
+openai
+
+# Voice/audio uploads
+python-multipart
+
+# Authentication and security
+pyjwt
+pwdlib[argon2]
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+
+# Code quality and formatting
+ruff
+mypy
