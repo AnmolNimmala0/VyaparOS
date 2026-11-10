@@ -26,13 +26,17 @@ def pcm_to_wav(pcm_bytes: bytes, sample_rate: int = 24000) -> bytes:
 async def synthesize_speech(
     text: str,
     language_code: str = "hi-IN",
-    voice: str = "Devansh",
+    voice: str = "Shivani",
+    speed: float = 1.1,
 ) -> bytes:
     """
     Synthesize speech audio from text using Gnani Timbre v3.0.
 
-    Supported voices include: Devansh, Shivani, Avinash, Lakshmi, Kalpana.
-    Returns standard WAV audio bytes.
+    Natural voices include:
+    - Shivani (Crisp, friendly conversational female voice)
+    - Chetana (Warm, cheerful female voice)
+    - Shubham (Youthful, energetic male voice)
+    - Kalpana (Calm, articulate female voice)
     """
     api_key = settings.TIMBRE_API_KEY or settings.GNANI_API_KEY
     if not api_key:
@@ -45,11 +49,15 @@ async def synthesize_speech(
         "Content-Type": "application/json",
     }
 
+    # Clean text: remove special UI formatting characters
+    cleaned_text = text.replace("✦", "").replace("₹", "रुपये ").replace("✓", "").replace("✕", "").strip()
+
     payload = {
         "model": "timbre-v3.0",
-        "text": text,
+        "text": cleaned_text,
         "voice": voice,
         "language_code": lang,
+        "speed": max(0.85, min(1.15, speed)),
     }
 
     async with httpx.AsyncClient(timeout=20.0) as client:
@@ -65,3 +73,4 @@ async def synthesize_speech(
         )
 
     return pcm_to_wav(response.content, sample_rate=24000)
+

@@ -185,7 +185,8 @@ async def process_text(
 class SpeakRequest(BaseModel):
     text: str
     language: str | None = "hi"
-    voice: str | None = "Devansh"
+    voice: str | None = "Shivani"
+    speed: float | None = 1.1
 
 
 @router.post("/speak")
@@ -198,7 +199,8 @@ async def speak_text(request: SpeakRequest):
         wav_bytes = await synthesize_speech(
             text=request.text,
             language_code=lang_code,
-            voice=request.voice or "Devansh",
+            voice=request.voice or "Shivani",
+            speed=request.speed if request.speed is not None else 1.1,
         )
         return Response(content=wav_bytes, media_type="audio/wav")
     except TimbreError as exc:

@@ -171,7 +171,8 @@ export default function Home() {
       body: JSON.stringify({
         text,
         language: lang === "hi" ? "hi" : "en",
-        voice: "Devansh",
+        voice: "Shivani",
+        speed: 1.1,
       }),
     })
       .then(async (res) => {
@@ -179,6 +180,7 @@ export default function Home() {
         const blob = await res.blob();
         const audioUrl = URL.createObjectURL(blob);
         const audio = new Audio(audioUrl);
+        audio.playbackRate = 1.05;
         audioPlayerRef.current = audio;
 
         audio.onended = () => {
