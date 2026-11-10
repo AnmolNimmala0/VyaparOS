@@ -12,7 +12,7 @@ class TimbreError(Exception):
 TIMBRE_INFERENCE_URL = "https://api.vachana.ai/api/v1/tts/inference"
 
 
-def pcm_to_wav(pcm_bytes: bytes, sample_rate: int = 24000) -> bytes:
+def pcm_to_wav(pcm_bytes: bytes, sample_rate: int = 48000) -> bytes:
     """Wrap raw 16-bit mono linear PCM bytes into standard WAV container."""
     wav_io = io.BytesIO()
     with wave.open(wav_io, "wb") as wav_file:
@@ -72,5 +72,5 @@ async def synthesize_speech(
             f"Timbre returned HTTP {response.status_code}: {response.text[:200]}"
         )
 
-    return pcm_to_wav(response.content, sample_rate=24000)
+    return pcm_to_wav(response.content, sample_rate=48000)
 
