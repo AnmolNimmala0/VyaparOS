@@ -12,10 +12,13 @@ from fastapi import (
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi.responses import Response
+
 from app.api.dependencies import get_demo_context, get_demo_store_id
 from app.core.database import get_db
 from app.integrations.gemini import GeminiError
 from app.integrations.prisma import PrismaError, transcribe_audio
+from app.integrations.timbre import TimbreError, synthesize_speech
 from app.schemas.voice import VoiceProcessResponse
 from app.services.voice_orchestration_service import process_text_request, process_voice_request
 
@@ -177,4 +180,31 @@ async def process_text(
             status_code=502,
             detail=str(exc),
         ) from exc
+
+
+class SpeakRequest(BaseModel):
+    text: str
+    language: str | None = "hi"
+    voice: str | None = "Devansh"
+
+
+@router.post("/speak")
+async def speak_text(request: SpeakRequest):
+    """Synthesize voice response audio via Gnani Timbre v3.0."""
+    try:
+        lang_code = (
+            "hi-IN" if (request.language or "").startswith("hi") else "en-IN"
+        )
+        wav_bytes = await synthesize_speech(
+            text=request.text,
+            language_code=lang_code,
+            voice=request.voice or "Devansh",
+        )
+        return Response(content=wav_bytes, media_type="audio/wav")
+    except TimbreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
 

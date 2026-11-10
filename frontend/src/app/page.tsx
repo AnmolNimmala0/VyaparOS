@@ -148,34 +148,81 @@ export default function Home() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   const speakMessage = useCallback((text: string, lang?: string | null) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (!text || typeof window === "undefined") return;
 
-    window.speechSynthesis.cancel();
-    if (!text) return;
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    const isHindi = lang === "hi";
-    utterance.lang = isHindi ? "hi-IN" : "en-IN";
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-
-    const voices = window.speechSynthesis.getVoices();
-    const matchedVoice = voices.find((v) =>
-      isHindi
-        ? v.lang.startsWith("hi")
-        : v.lang.startsWith("en-IN") || v.lang.startsWith("en-GB") || v.lang.startsWith("en")
-    );
-    if (matchedVoice) {
-      utterance.voice = matchedVoice;
+    // Stop any existing playback
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current = null;
+    }
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
     }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
 
-    window.speechSynthesis.speak(utterance);
+    // 1. Primary: Gnani Timbre v3.0 Neural Voice
+    fetch(`${API}/voice/speak`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        language: lang === "hi" ? "hi" : "en",
+        voice: "Devansh",
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Timbre TTS synthesis error");
+        const blob = await res.blob();
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        audioPlayerRef.current = audio;
+
+        audio.onended = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+        };
+        audio.onerror = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+        };
+
+        await audio.play();
+      })
+      .catch(() => {
+        // 2. Client-side fallback: Web Speech Synthesis
+        if (!("speechSynthesis" in window)) {
+          setIsSpeaking(false);
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        const isHindi = lang === "hi";
+        utterance.lang = isHindi ? "hi-IN" : "en-IN";
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        const voices = window.speechSynthesis.getVoices();
+        const matchedVoice = voices.find((v) =>
+          isHindi
+            ? v.lang.startsWith("hi")
+            : v.lang.startsWith("en-IN") ||
+              v.lang.startsWith("en-GB") ||
+              v.lang.startsWith("en")
+        );
+        if (matchedVoice) {
+          utterance.voice = matchedVoice;
+        }
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        window.speechSynthesis.speak(utterance);
+      });
   }, []);
 
   // Live Highlight & Operation-Aware Feedback
@@ -1142,7 +1189,16 @@ export default function Home() {
                     className={`tts-speaker-btn ${isSpeaking ? "tts-speaking" : ""}`}
                     onClick={() => {
                       if (isSpeaking) {
-                        window.speechSynthesis?.cancel();
+                        if (audioPlayerRef.current) {
+                          audioPlayerRef.current.pause();
+                          audioPlayerRef.current = null;
+                        }
+                        if (
+                          typeof window !== "undefined" &&
+                          "speechSynthesis" in window
+                        ) {
+                          window.speechSynthesis.cancel();
+                        }
                         setIsSpeaking(false);
                       } else {
                         speakMessage(
@@ -1151,9 +1207,9 @@ export default function Home() {
                         );
                       }
                     }}
-                    title="Listen to audio response"
+                    title="Listen to audio response via Gnani Timbre"
                   >
-                    {isSpeaking ? "🔊 Speaking..." : "🔊 Listen"}
+                    {isSpeaking ? "🔊 Playing Timbre..." : "🔊 Listen"}
                   </button>
                 </div>
 
