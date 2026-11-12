@@ -282,17 +282,19 @@ def validate_intent_consistency(
     return intent
 
 
-async def analyze_with_groq(
+async def analyze_with_openai_compatible(
     transcript: str,
+    *,
+    base_url: str,
+    api_key: str,
+    model: str,
+    provider_name: str,
 ) -> IntentAnalysis:
-    """Use Groq strict structured outputs as fallback intent extraction."""
-
-    if not settings.GROQ_API_KEY:
-        raise GeminiError("Groq API key is not configured.")
+    """Extract intent via an OpenAI-compatible chat completions endpoint (Evon v3.3 or Groq)."""
 
     client = AsyncOpenAI(
-        api_key=settings.GROQ_API_KEY,
-        base_url="https://api.groq.com/openai/v1",
+        api_key=api_key or "EMPTY",
+        base_url=base_url,
         timeout=30.0,
         max_retries=0,
     )
@@ -394,7 +396,7 @@ async def analyze_with_groq(
 
     try:
         response = await client.chat.completions.create(
-            model=settings.GROQ_MODEL,
+            model=model,
             messages=[
                 {
                     "role": "system",
@@ -421,43 +423,84 @@ async def analyze_with_groq(
         output = response.choices[0].message.content
 
         if not output:
-            raise GeminiError("Groq returned an empty response.")
+            raise GeminiError(f"{provider_name} returned an empty response.")
 
         intent = IntentAnalysis.model_validate_json(output)
         intent = validate_intent_consistency(intent)
 
         logger.info(
-            "Intent successfully extracted using Groq strict structured outputs."
+            "Intent successfully extracted using %s strict structured outputs.",
+            provider_name,
         )
 
         return intent
 
     except ValidationError as exc:
-        logger.exception("Groq response failed Pydantic validation.")
+        logger.exception("%s response failed Pydantic validation.", provider_name)
         raise GeminiError(
-            "Groq returned an invalid intent structure."
+            f"{provider_name} returned an invalid intent structure."
         ) from exc
 
     except GeminiError:
         raise
 
     except Exception as exc:
-        logger.exception("Groq fallback failed.")
+        logger.exception("%s intent extraction failed.", provider_name)
         raise GeminiError(
-            f"Groq intent extraction failed: {type(exc).__name__}."
+            f"{provider_name} intent extraction failed: {type(exc).__name__}."
         ) from exc
 
     finally:
         await client.close()
 
 
+async def analyze_with_evon(
+    transcript: str,
+) -> IntentAnalysis:
+    """Use Gnani Evon v3.3 via an OpenAI-compatible endpoint."""
+    if not settings.EVON_BASE_URL or not settings.EVON_MODEL:
+        raise GeminiError("Evon v3.3 endpoint or model is not configured.")
+
+    return await analyze_with_openai_compatible(
+        transcript,
+        base_url=settings.EVON_BASE_URL,
+        api_key=settings.EVON_API_KEY or settings.GNANI_API_KEY,
+        model=settings.EVON_MODEL,
+        provider_name="Gnani Evon v3.3",
+    )
+
+
+async def analyze_with_groq(
+    transcript: str,
+) -> IntentAnalysis:
+    """Use Groq strict structured outputs as fallback intent extraction."""
+    if not settings.GROQ_API_KEY:
+        raise GeminiError("Groq API key is not configured.")
+
+    return await analyze_with_openai_compatible(
+        transcript,
+        base_url="https://api.groq.com/openai/v1",
+        api_key=settings.GROQ_API_KEY,
+        model=settings.GROQ_MODEL,
+        provider_name="Groq",
+    )
+
+
 async def analyze_intent(
     transcript: str,
 ) -> IntentAnalysis:
-    """Use Gemini as primary provider and Groq as fallback."""
+    """Use Gnani Evon v3.3 (when configured), then Gemini, then Groq as fallback."""
 
     if not transcript or not transcript.strip():
         raise GeminiError("Transcript cannot be empty.")
+
+    if settings.EVON_BASE_URL and settings.EVON_MODEL:
+        try:
+            return await analyze_with_evon(transcript)
+        except Exception:
+            logger.warning(
+                "Gnani Evon v3.3 unavailable. Falling back to Gemini/Groq."
+            )
 
     # If Gemini is not configured, use Groq directly.
     if not settings.GEMINI_API_KEY:

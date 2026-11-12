@@ -40,8 +40,11 @@ VyaparOS simplifies everyday shop operations using voice and natural language (H
   - FFmpeg for 16 kHz mono PCM WAV conversion
 
 - **AI & Integrations**:
-  - **Gnani Prisma v3**: Production speech-to-text for Indian vernacular audio.
-  - **Gemini / Groq LLMs**: Dual-engine intent classification, entity resolution, and parameter extraction with automatic sub-second failover.
+  - **Gnani.ai Prisma v3.0**: Production Speech-to-Text (`indic-auto` + Codemix) for Indian vernacular audio with retail keyword biasing.
+  - **Gnani.ai Timbre v3.0**: Neural Text-to-Speech (`Shivani` voice @ 48 kHz) for natural Hindi & Indian English voice responses.
+  - **LLM Intent Extraction**: Supports **Gnani.ai Evon v3.3** (OpenAI-compatible endpoint when configured via `EVON_BASE_URL`), with **Gemini** and **Groq** automatic failover.
+
+> 📄 **Solution One-Pager**: See [PITCH.md](./PITCH.md) for a concise one-page overview of the problem, solution, architecture, and impact.
 
 ---
 
@@ -56,28 +59,32 @@ VyaparOS simplifies everyday shop operations using voice and natural language (H
 ### 1. Database Setup
 ```bash
 cd backend
-docker-compose up -d
+docker compose up -d
 ```
 
 ### 2. Backend Setup
 ```bash
 cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
 # Configure environment variables
 cp .env.example .env
-# Fill in your database URL and API keys in .env
+# Fill in your API keys in .env (GNANI_API_KEY, GEMINI_API_KEY / GROQ_API_KEY, and optional EVON_BASE_URL / EVON_MODEL)
 
 # Run database migrations
 alembic upgrade head
+
+# Seed the demo store, products, and customer credit ledger
+python -m app.seed_demo
 
 # Start API server
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ### 3. Frontend Setup
+Open a new terminal window:
 ```bash
 cd frontend
 npm install
@@ -93,11 +100,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 Run backend logic and schema verification tests:
 ```bash
 cd backend
-pytest
+source .venv/bin/activate
+pytest app/tests/test_core_logic.py -v
 ```
 
----
-
-## 📄 License
-MIT License. Built for India's small businesses.
 
